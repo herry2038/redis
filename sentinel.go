@@ -36,6 +36,8 @@ type FailoverOptions struct {
 	// Route all commands to slave read-only nodes.
 	SlaveOnly bool
 
+	Rws   bool
+	IdcId string
 	// Use slaves disconnected with master when cannot get connected slaves
 	// Now, this option only works in RandomSlaveAddr function.
 	UseDisconnectedSlaves bool
@@ -143,6 +145,8 @@ func (opt *FailoverOptions) clusterOptions() *ClusterOptions {
 
 		RouteByLatency: opt.RouteByLatency,
 		RouteRandomly:  opt.RouteRandomly,
+		Rws:            opt.Rws,
+		IdcId:          opt.IdcId,
 
 		MinRetryBackoff: opt.MinRetryBackoff,
 		MaxRetryBackoff: opt.MaxRetryBackoff,

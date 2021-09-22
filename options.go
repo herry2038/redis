@@ -33,7 +33,8 @@ type Options struct {
 	// Default is tcp.
 	Network string
 	// host:port address.
-	Addr string
+	Addr  string
+	IdcId string
 
 	// Dialer creates new network connection and has priority over
 	// Network and Addr options.

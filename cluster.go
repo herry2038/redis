@@ -8,6 +8,7 @@ import (
 	"net"
 	"runtime"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -43,6 +44,9 @@ type ClusterOptions struct {
 	// Allows routing read-only commands to the random master or slave node.
 	// It automatically enables ReadOnly.
 	RouteRandomly bool
+
+	Rws   bool
+	IdcId string // LocalIdcId
 
 	// Optional function that returns cluster slots information.
 	// It is useful to manually create cluster of standalone Redis servers
@@ -89,7 +93,7 @@ func (opt *ClusterOptions) init() {
 		opt.MaxRedirects = 3
 	}
 
-	if opt.RouteByLatency || opt.RouteRandomly {
+	if opt.RouteByLatency || opt.RouteRandomly || opt.Rws {
 		opt.ReadOnly = true
 	}
 
@@ -164,6 +168,7 @@ func (opt *ClusterOptions) clientOptions() *Options {
 		// READONLY command against that node -- setting readOnly to false in such
 		// situations in the options below will prevent that from happening.
 		readOnly: opt.ReadOnly && opt.ClusterSlots == nil,
+		IdcId:    opt.IdcId,
 	}
 }
 
@@ -175,13 +180,26 @@ type clusterNode struct {
 	latency    uint32 // atomic
 	generation uint32 // atomic
 	failing    uint32 // atomic
+	idcId      string
 }
 
 func newClusterNode(clOpt *ClusterOptions, addr string) *clusterNode {
 	opt := clOpt.clientOptions()
-	opt.Addr = addr
+
+	addrParts := strings.Split(addr, ":")
+	if len(addrParts) < 2 {
+		panic(fmt.Sprintf("addr: %s invalid!", addr))
+	}
+	opt.Addr = net.JoinHostPort(addrParts[0], addrParts[1])
+
+	idcId := ""
+	if len(addrParts) == 3 {
+		idcId = addrParts[2]
+	}
+
 	node := clusterNode{
 		Client: clOpt.NewClient(opt),
+		idcId:  idcId,
 	}
 
 	node.latency = math.MaxUint32
@@ -605,6 +623,29 @@ func (c *clusterState) slotRandomNode(slot int) (*clusterNode, error) {
 		}
 	}
 	return nodes[randomNodes[0]], nil
+}
+
+func (c *clusterState) slotSameIdcNode(slot int) (*clusterNode, error) {
+	nodes := c.slotNodes(slot)
+	if len(nodes) == 0 {
+		return c.nodes.Random()
+	}
+
+	var node *clusterNode
+	for _, n := range nodes {
+		if n.Failing() {
+			continue
+		}
+		if node == nil && n.idcId == c.nodes.opt.IdcId {
+			node = n
+		}
+	}
+	if node != nil {
+		return node, nil
+	}
+
+	// If all nodes are failing - return random node
+	return c.nodes.Random()
 }
 
 func (c *clusterState) slotNodes(slot int) []*clusterNode {
@@ -1660,6 +1701,9 @@ func (c *ClusterClient) cmdNode(
 }
 
 func (c *clusterClient) slotReadOnlyNode(state *clusterState, slot int) (*clusterNode, error) {
+	if c.opt.Rws {
+		return state.slotSameIdcNode(slot)
+	}
 	if c.opt.RouteByLatency {
 		return state.slotClosestNode(slot)
 	}
