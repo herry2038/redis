@@ -344,3 +344,10 @@ func (c *PlusClient) reaper(idleCheckFrequency time.Duration) {
 func (c *PlusClient) ReloadState(ctx context.Context) {
 	c.state.LazyReload()
 }
+
+// Do creates a Cmd from the args and processes the cmd.
+func (c *PlusClient) Do(ctx context.Context, args ...interface{}) *Cmd {
+	cmd := NewCmd(ctx, args...)
+	_ = c.Process(ctx, cmd)
+	return cmd
+}
