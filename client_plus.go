@@ -181,6 +181,12 @@ func (c *PlusClient) process(ctx context.Context, cmd Cmder) error {
 				return err
 			}
 		}
+		valMap := ctx.Value("valMap")
+		if valMap != nil {
+			if valMap2, ok := valMap.(map[string]string); ok {
+				valMap2["instance"] = node.Client.opt.Addr
+			}
+		}
 
 		if ask {
 			pipe := node.Client.Pipeline()

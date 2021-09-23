@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	ctx = context.Background()
+	ctx = context.WithValue(context.Background(), "valMap", make(map[string]string))
 )
 
 func main() {
@@ -70,29 +70,49 @@ func ExampleClientOp() {
 	if err != nil {
 		panic(err)
 	}
+	PrintInstance("set key")
 
 	val, err := client.Get(ctx, "key").Result()
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("key", val)
+	PrintInstance("get key")
 
 	val, err = client.Get(ctx, "key").Result()
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("key", val)
-	/*
-		val2, err := client.Get(ctx, "key2").Result()
-		if err == redis.Nil {
-			fmt.Println("key2 does not exist")
-		} else if err != nil {
-			panic(err)
-		} else {
-			fmt.Println("key2", val2)
-		}
-	*/
+
+	PrintInstance("get key  twice")
+
+	val2, err := client.Get(ctx, "key2").Result()
+	if err == redis.Nil {
+		fmt.Println("key2 does not exist")
+	} else if err != nil {
+		panic(err)
+	} else {
+		fmt.Println("key2", val2)
+	}
+
+	PrintInstance("get key2")
+
 	//time.Sleep(1000 * time.Second)
 	// Output: key value
 	// key2 does not exist
+}
+
+func PrintInstance(prefix string) {
+	valmap := ctx.Value("valMap")
+	if valmap != nil {
+		if valMap2, ok := valmap.(map[string]string); ok {
+			val := valMap2["instance"]
+			fmt.Printf("%s: last instance: %s\n", prefix, val)
+			return
+		}
+	}
+
+	fmt.Printf("%s: last instance: unknown\n", prefix)
+
 }
