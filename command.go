@@ -151,8 +151,16 @@ func (cmd *baseCmd) stringArg(pos int) string {
 	if pos < 0 || pos >= len(cmd.args) {
 		return ""
 	}
-	s, _ := cmd.args[pos].(string)
-	return s
+
+	s, ok := cmd.args[pos].(string)
+	if ok {
+		return s
+	}
+	bytes, ok := cmd.args[pos].([]byte)
+	if ok {
+		return string(bytes)
+	}
+	return ""
 }
 
 func (cmd *baseCmd) firstKeyPos() int8 {
