@@ -3,7 +3,7 @@ package common
 import "github.com/go-redis/redis/v8"
 
 var (
-	SentinelAddr = "XXXXXXX:20019"
+	SentinelAddr = "XXXXX:20019"
 )
 
 func GetMasterClient() *redis.PlusClient {

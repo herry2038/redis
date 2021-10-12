@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-redis/redis/v8"
+	"github.com/go-redis/redis/v8/example/common"
 	"time"
 )
 
@@ -39,7 +40,7 @@ func ExampleClientOp() {
 	//	DB:       0,  // use default DB
 	//})
 
-	client := getClient()
+	client := common.GetClient()
 
 	err := client.Set(ctx, "key", "value4", 0).Err()
 	if err != nil {
@@ -104,9 +105,11 @@ func GetLastExecInstance() string {
 
 func PressTest() {
 	{
-		client := getClient()
+		client := common.GetClient()
 		statistics := make(map[string]int)
-		client.Get(ctx, "key")
+		for i := 0; i < 10; i++ {
+			client.Get(ctx, "key")
+		}
 
 		start := time.Now()
 
@@ -130,9 +133,11 @@ func PressTest() {
 	}
 
 	{
-		client := getMasterClient()
+		client := common.GetMasterClient()
 		statistics := make(map[string]int)
-		client.Get(ctx, "key")
+		for i := 0; i < 10; i++ {
+			client.Get(ctx, "key")
+		}
 
 		start := time.Now()
 
