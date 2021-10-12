@@ -4,15 +4,19 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-redis/redis/v8"
+	"time"
 )
 
 var (
-	ctx = context.WithValue(context.Background(), "valMap", make(map[string]string))
+	//ctx = context.WithValue(context.Background(), "valMap", make(map[string]string))
+	ctx = context.Background()
 )
 
 func main() {
 	//ExampleNewClient()
-	ExampleClientOp()
+	//ExampleClientOp()
+
+	PressTest()
 }
 
 func ExampleNewClient() {
@@ -35,36 +39,7 @@ func ExampleClientOp() {
 	//	DB:       0,  // use default DB
 	//})
 
-	client := redis.NewPlusClient(&redis.FailoverOptions{
-		MasterName:            "TestDBARedis001_001",
-		SentinelAddrs:         []string{"XX.XX.XX.XX:20019"},
-		SentinelPassword:      "",
-		RouteByLatency:        false,
-		RouteRandomly:         true,
-		SlaveOnly:             true,
-		Rws:                   true,
-		IdcId:                 "1234",
-		UseDisconnectedSlaves: false,
-		Dialer:                nil,
-		OnConnect:             nil,
-		Username:              "",
-		Password:              "",
-		DB:                    0,
-		MaxRetries:            0,
-		MinRetryBackoff:       0,
-		MaxRetryBackoff:       0,
-		DialTimeout:           0,
-		ReadTimeout:           0,
-		WriteTimeout:          0,
-		PoolFIFO:              false,
-		PoolSize:              0,
-		MinIdleConns:          0,
-		MaxConnAge:            0,
-		PoolTimeout:           0,
-		IdleTimeout:           0,
-		IdleCheckFrequency:    0,
-		TLSConfig:             nil,
-	})
+	client := getClient()
 
 	err := client.Set(ctx, "key", "value4", 0).Err()
 	if err != nil {
@@ -114,5 +89,69 @@ func PrintInstance(prefix string) {
 	}
 
 	fmt.Printf("%s: last instance: unknown\n", prefix)
+}
 
+func GetLastExecInstance() string {
+	valmap := ctx.Value("valMap")
+	if valmap != nil {
+		if valMap2, ok := valmap.(map[string]string); ok {
+			val := valMap2["instance"]
+			return val
+		}
+	}
+	return ""
+}
+
+func PressTest() {
+	{
+		client := getClient()
+		statistics := make(map[string]int)
+		client.Get(ctx, "key")
+
+		start := time.Now()
+
+		totalCnt := 10000
+		for i := 0; i < totalCnt; i++ {
+			client.Get(ctx, "key")
+			instance := GetLastExecInstance()
+			cnt, ok := statistics[instance]
+			if ok {
+				statistics[instance] = cnt + 1
+			} else {
+				statistics[instance] = 1
+			}
+		}
+
+		usedSeconds := time.Now().Sub(start).Seconds()
+		fmt.Printf("total executed: %d, used: %.2f\n", totalCnt, usedSeconds)
+		for instance, cnt := range statistics {
+			fmt.Printf("instance: %s executed: %d\n", instance, cnt)
+		}
+	}
+
+	{
+		client := getMasterClient()
+		statistics := make(map[string]int)
+		client.Get(ctx, "key")
+
+		start := time.Now()
+
+		totalCnt := 10000
+		for i := 0; i < totalCnt; i++ {
+			client.Get(ctx, "key")
+			instance := GetLastExecInstance()
+			cnt, ok := statistics[instance]
+			if ok {
+				statistics[instance] = cnt + 1
+			} else {
+				statistics[instance] = 1
+			}
+		}
+
+		usedSeconds := time.Now().Sub(start).Seconds()
+		fmt.Printf("total executed: %d, used: %.2f\n", totalCnt, usedSeconds)
+		for instance, cnt := range statistics {
+			fmt.Printf("instance: %s executed: %d\n", instance, cnt)
+		}
+	}
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/go-redis/redis/v8"
+	"github.com/go-redis/redis/v8/example/common"
 )
 
 var (
@@ -37,7 +38,7 @@ func ExampleClientOp() {
 
 	client := redis.NewFailoverClusterClient(&redis.FailoverOptions{
 		MasterName:            "TestDBARedis001_001",
-		SentinelAddrs:         []string{"XX.XX.XX.XX:20019"},
+		SentinelAddrs:         []string{common.SentinelAddr},
 		SentinelPassword:      "",
 		RouteByLatency:        false,
 		RouteRandomly:         true,
@@ -64,25 +65,30 @@ func ExampleClientOp() {
 		TLSConfig:             nil,
 	})
 
-	err := client.Set(ctx, "key", "value4", 0).Err()
+	err := client.MGet(ctx, "key", "value4", "value3", "value3").Err()
 	if err != nil {
 		panic(err)
 	}
 
+	//err := client.Set(ctx, "key", "value4", 0).Err()
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
 	val, err := client.Get(ctx, "key").Result()
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("key", val)
-
-	val2, err := client.Get(ctx, "key2").Result()
-	if err == redis.Nil {
-		fmt.Println("key2 does not exist")
-	} else if err != nil {
-		panic(err)
-	} else {
-		fmt.Println("key2", val2)
-	}
+	//
+	//val2, err := client.Get(ctx, "key2").Result()
+	//if err == redis.Nil {
+	//	fmt.Println("key2 does not exist")
+	//} else if err != nil {
+	//	panic(err)
+	//} else {
+	//	fmt.Println("key2", val2)
+	//}
 
 	//time.Sleep(1000 * time.Second)
 	// Output: key value

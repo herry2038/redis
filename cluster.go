@@ -467,6 +467,7 @@ type clusterState struct {
 
 	generation uint32
 	createdAt  time.Time
+	sameIdcPos uint32
 }
 
 func newClusterState(
@@ -631,21 +632,22 @@ func (c *clusterState) slotSameIdcNode(slot int) (*clusterNode, error) {
 		return c.nodes.Random()
 	}
 
-	var node *clusterNode
+	sameIdcNodes := make([]*clusterNode, 0, len(nodes))
 	for _, n := range nodes {
 		if n.Failing() {
 			continue
 		}
-		if node == nil && n.idcId == c.nodes.opt.IdcId {
-			node = n
+		if n.idcId == c.nodes.opt.IdcId {
+			sameIdcNodes = append(sameIdcNodes, n)
 		}
 	}
-	if node != nil {
-		return node, nil
+	if len(sameIdcNodes) == 0 {
+		return c.nodes.Random()
 	}
-
-	// If all nodes are failing - return random node
-	return c.nodes.Random()
+	pos := atomic.AddUint32(&c.sameIdcPos, 1)
+	node := sameIdcNodes[pos%uint32(len(sameIdcNodes))]
+	//fmt.Printf("choose node: %s\n", node.String())
+	return node, nil
 }
 
 func (c *clusterState) slotNodes(slot int) []*clusterNode {
