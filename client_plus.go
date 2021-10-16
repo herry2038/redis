@@ -387,3 +387,37 @@ func (c *PlusClient) DoPlus(ctx context.Context, mode ExecMODE, args ...interfac
 	_ = c.Process(ctx, cmd)
 	return cmd
 }
+
+// PoolStats returns accumulated connection pool stats.
+func (c *PlusClient) PoolStats() *PoolStats {
+	var acc PoolStats
+
+	state, _ := c.state.Get(context.TODO())
+	if state == nil {
+		return &acc
+	}
+
+	for _, node := range state.Masters {
+		s := node.Client.connPool.Stats()
+		acc.Hits += s.Hits
+		acc.Misses += s.Misses
+		acc.Timeouts += s.Timeouts
+
+		acc.TotalConns += s.TotalConns
+		acc.IdleConns += s.IdleConns
+		acc.StaleConns += s.StaleConns
+	}
+
+	for _, node := range state.Slaves {
+		s := node.Client.connPool.Stats()
+		acc.Hits += s.Hits
+		acc.Misses += s.Misses
+		acc.Timeouts += s.Timeouts
+
+		acc.TotalConns += s.TotalConns
+		acc.IdleConns += s.IdleConns
+		acc.StaleConns += s.StaleConns
+	}
+
+	return &acc
+}
