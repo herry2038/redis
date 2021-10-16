@@ -176,7 +176,7 @@ func (c *PlusClient) process(ctx context.Context, cmd Cmder) error {
 
 		if node == nil {
 			var err error
-			node, err = c.cmdNode(ctx, cmdInfo, slot)
+			node, err = c.cmdNodePlus(ctx, cmdInfo, slot, cmd.ExecMode())
 			if err != nil {
 				return err
 			}
@@ -273,6 +273,34 @@ func (c *PlusClient) cmdNode(
 
 	if c.opt.ReadOnly && cmdInfo != nil && cmdInfo.ReadOnly {
 		return c.slotReadOnlyNode(state, slot)
+	}
+	return state.slotMasterNode(slot)
+}
+
+func (c *PlusClient) cmdNodePlus(
+	ctx context.Context,
+	cmdInfo *CommandInfo,
+	slot int,
+	mode ExecMODE,
+) (*clusterNode, error) {
+	state, err := c.state.Get(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if c.opt.ReadOnly && cmdInfo != nil && cmdInfo.ReadOnly {
+		switch mode {
+		case MODE_DEFAULT:
+			return c.slotReadOnlyNode(state, slot)
+		case MODE_CONSISTENCY:
+			return state.slotMasterNode(slot)
+		case MODE_IDC_RWS:
+			return state.slotSameIdcNode(slot)
+		case MODE_LATENCY_RWS:
+			return state.slotClosestNode(slot)
+		case MODE_RAMDOM_RWS:
+			return state.slotRandomNode(slot)
+		}
 	}
 	return state.slotMasterNode(slot)
 }

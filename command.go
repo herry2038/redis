@@ -14,6 +14,8 @@ import (
 )
 
 type Cmder interface {
+	ExecMode() ExecMODE
+	SetExecMode(m ExecMODE)
 	Name() string
 	FullName() string
 	Args() []interface{}
@@ -110,10 +112,11 @@ func cmdString(cmd Cmder, val interface{}) string {
 //------------------------------------------------------------------------------
 
 type baseCmd struct {
-	ctx    context.Context
-	args   []interface{}
-	err    error
-	keyPos int8
+	ctx      context.Context
+	args     []interface{}
+	err      error
+	keyPos   int8
+	execMode ExecMODE
 
 	_readTimeout *time.Duration
 }
@@ -185,6 +188,14 @@ func (cmd *baseCmd) readTimeout() *time.Duration {
 
 func (cmd *baseCmd) setReadTimeout(d time.Duration) {
 	cmd._readTimeout = &d
+}
+
+func (cmd *baseCmd) ExecMode() ExecMODE {
+	return cmd.execMode
+}
+
+func (cmd *baseCmd) SetExecMode(m ExecMODE) {
+	cmd.execMode = m
 }
 
 //------------------------------------------------------------------------------

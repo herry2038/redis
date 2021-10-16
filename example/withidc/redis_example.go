@@ -9,8 +9,8 @@ import (
 )
 
 var (
-	//ctx = context.WithValue(context.Background(), "valMap", make(map[string]string))
-	ctx = context.Background()
+	ctx = context.WithValue(context.Background(), "valMap", make(map[string]string))
+	//ctx = context.Background()
 )
 
 func main() {
@@ -104,6 +104,7 @@ func GetLastExecInstance() string {
 }
 
 func PressTest() {
+	totalCnt := 1000
 	{
 		client := common.GetClient()
 		statistics := make(map[string]int)
@@ -113,7 +114,6 @@ func PressTest() {
 
 		start := time.Now()
 
-		totalCnt := 10000
 		for i := 0; i < totalCnt; i++ {
 			client.Get(ctx, "key")
 			instance := GetLastExecInstance()
@@ -141,7 +141,6 @@ func PressTest() {
 
 		start := time.Now()
 
-		totalCnt := 10000
 		for i := 0; i < totalCnt; i++ {
 			client.Get(ctx, "key")
 			instance := GetLastExecInstance()
