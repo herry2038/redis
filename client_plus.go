@@ -379,3 +379,11 @@ func (c *PlusClient) Do(ctx context.Context, args ...interface{}) *Cmd {
 	_ = c.Process(ctx, cmd)
 	return cmd
 }
+
+// Do creates a Cmd from the args and processes the cmd.
+func (c *PlusClient) DoPlus(ctx context.Context, mode ExecMODE, args ...interface{}) *Cmd {
+	cmd := NewCmdPlus(ctx, mode, args...)
+
+	_ = c.Process(ctx, cmd)
+	return cmd
+}

@@ -215,6 +215,16 @@ func NewCmd(ctx context.Context, args ...interface{}) *Cmd {
 	}
 }
 
+func NewCmdPlus(ctx context.Context, mode ExecMODE, args ...interface{}) *Cmd {
+	return &Cmd{
+		baseCmd: baseCmd{
+			ctx:      ctx,
+			args:     args,
+			execMode: mode,
+		},
+	}
+}
+
 func (cmd *Cmd) String() string {
 	return cmdString(cmd, cmd.val)
 }
