@@ -421,3 +421,7 @@ func (c *PlusClient) PoolStats() *PoolStats {
 
 	return &acc
 }
+
+func (c *PlusClient) Options() *ClusterOptions {
+	return c.opt
+}
