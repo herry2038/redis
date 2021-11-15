@@ -41,6 +41,7 @@ func ExampleClientOp() {
 		SentinelAddrs:         []string{common.SentinelAddr},
 		SentinelPassword:      "",
 		RouteByLatency:        false,
+		Rws:                   true,
 		RouteRandomly:         true,
 		SlaveOnly:             true,
 		UseDisconnectedSlaves: false,
@@ -65,10 +66,10 @@ func ExampleClientOp() {
 		TLSConfig:             nil,
 	})
 
-	err := client.MGet(ctx, "key", "value4", "value3", "value3").Err()
-	if err != nil {
-		panic(err)
-	}
+	//err := client.MGet(ctx, "key", "value4", "value3", "value3").Err()
+	//if err != nil {
+	//	panic(err)
+	//}
 
 	//err := client.Set(ctx, "key", "value4", 0).Err()
 	//if err != nil {
@@ -80,6 +81,17 @@ func ExampleClientOp() {
 		panic(err)
 	}
 	fmt.Println("key", val)
+
+	cursor := uint64(0)
+	var keys []string
+	keys, cursor, err = client.Scan(ctx, cursor, "", 2).Result()
+	fmt.Printf("scan keys keys: %v, cursor: %d\n", keys, cursor)
+
+	for cursor != 0 {
+		keys, cursor, err = client.Scan(ctx, cursor, "", 2).Result()
+		fmt.Printf("scan keys keys: %v, cursor: %d\n", keys, cursor)
+	}
+
 	//
 	//val2, err := client.Get(ctx, "key2").Result()
 	//if err == redis.Nil {

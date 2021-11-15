@@ -17,12 +17,15 @@ func main() {
 	//ExampleNewClient()
 	//ExampleClientOp()
 
-	PressTest()
+	// PressTest()
+
+	//ExampleClientScan()
+	ExampleClientSscan()
 }
 
 func ExampleNewClient() {
 	client := redis.NewClient(&redis.Options{
-		Addr:     "10.12.36.4:4025",
+		Addr:     common.DirectAddr,
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
@@ -30,6 +33,97 @@ func ExampleNewClient() {
 	pong, err := client.Ping(ctx).Result()
 	fmt.Println(pong, err)
 	// Output: PONG <nil>
+}
+
+func ExampleClientSscan() error {
+
+	client := common.GetPlusClient()
+	//client := common.GetDirectClient()
+	var err error
+	//var val string
+
+	//val, err = client.Get(ctx, "key").Result()
+	//if err != nil {
+	//	panic(err)
+	//}
+	//fmt.Println("get key", val)
+	i := 0
+	f := func() {
+		i++
+		fmt.Printf("running : %d\n", i)
+		cursor := uint64(0)
+		var keys []string
+
+		length := 0
+
+		var values map[string]struct{} = make(map[string]struct{})
+
+		keys, cursor, err = client.SScan(ctx, "sa", cursor, "", 3).Result()
+		fmt.Printf("scan keys keys: %v, cursor: %d\n", keys, cursor)
+
+		for _, k := range keys {
+			if _, ok := values[k]; ok {
+				fmt.Printf("key %s already exists, get a repeated key!!!\n")
+			} else {
+				values[k] = struct{}{}
+			}
+		}
+		length += len(keys)
+
+		for cursor != 0 {
+			keys, cursor, err = client.SScan(ctx, "sa", cursor, "", 3).Result()
+			fmt.Printf("scan keys keys: %v, cursor: %d\n", keys, cursor)
+
+			for _, k := range keys {
+				if _, ok := values[k]; ok {
+					fmt.Printf("key %s already exists, get a repeated key!!!\n")
+				} else {
+					values[k] = struct{}{}
+				}
+			}
+			length += len(keys)
+		}
+		fmt.Printf("Total keys : %d\n", length)
+	}
+
+	f()
+	f()
+	f()
+	return err
+}
+
+func ExampleClientScan() error {
+
+	client := common.GetPlusClient()
+	//client := common.GetDirectClient()
+	var err error
+	//var val string
+
+	//val, err = client.Get(ctx, "key").Result()
+	//if err != nil {
+	//	panic(err)
+	//}
+	//fmt.Println("get key", val)
+	i := 0
+	f := func() {
+		i++
+		fmt.Printf("running : %d\n", i)
+		cursor := uint64(0)
+		var keys []string
+
+		keys, cursor, err = client.Scan(ctx, cursor, "", 2).Result()
+		fmt.Printf("scan keys keys: %v, cursor: %d\n", keys, cursor)
+
+		for cursor != 0 {
+			keys, cursor, err = client.Scan(ctx, cursor, "", 2).Result()
+			fmt.Printf("scan keys keys: %v, cursor: %d\n", keys, cursor)
+		}
+	}
+
+	f()
+	f()
+	f()
+	return err
 }
 
 func ExampleClientOp() {
@@ -40,7 +134,7 @@ func ExampleClientOp() {
 	//	DB:       0,  // use default DB
 	//})
 
-	client := common.GetClient()
+	client := common.GetPlusClient()
 
 	err := client.Set(ctx, "key", "value4", 0).Err()
 	if err != nil {
@@ -106,7 +200,7 @@ func GetLastExecInstance() string {
 func PressTest() {
 	totalCnt := 1000
 	{
-		client := common.GetClient()
+		client := common.GetPlusClient()
 		statistics := make(map[string]int)
 		for i := 0; i < 10; i++ {
 			client.Get(ctx, "key")

@@ -5,6 +5,7 @@ import (
 	"github.com/go-redis/redis/v8/internal"
 	"github.com/go-redis/redis/v8/internal/pool"
 	"math/rand"
+	"strconv"
 	"time"
 )
 
@@ -173,20 +174,24 @@ func (c *PlusClient) process(ctx context.Context, cmd Cmder) error {
 				return err
 			}
 		}
-
 		if node == nil {
 			var err error
-			node, err = c.cmdNodePlus(ctx, cmdInfo, slot, cmd.ExecMode())
+			node, err = c.cmdNodePlus(ctx, cmdInfo, slot, cmd)
 			if err != nil {
 				return err
 			}
 		}
-		valMap := ctx.Value("valMap")
-		if valMap != nil {
-			if valMap2, ok := valMap.(map[string]string); ok {
+		/*
+			valMap := ctx.Value("valMap")
+			var valMap2 map[string]string
+			if valMap != nil {
+				valMap2, _ = valMap.(map[string]string)
+
+			}
+			if valMap2 != nil {
 				valMap2["instance"] = node.Client.opt.Addr
 			}
-		}
+		*/
 
 		if ask {
 			pipe := node.Client.Pipeline()
@@ -277,32 +282,145 @@ func (c *PlusClient) cmdNode(
 	return state.slotMasterNode(slot)
 }
 
+func isScanCursorZero(scan *ScanCmd) (bool, error) {
+	if len(scan.args) < 2 {
+		return false, nil
+	}
+	pos := 1
+	switch val := scan.args[0].(type) {
+	case []byte:
+		if val[0] == 's' || val[0] == 'S' {
+			if val[1] == 's' || val[1] == 'S' {
+				if len(scan.args) < 3 {
+					return false, nil
+				}
+				pos = 2
+			}
+		} else if val[0] == 'h' || val[0] == 'H' {
+			if len(scan.args) < 3 {
+				return false, nil
+			}
+			pos = 2
+		}
+	case string:
+		if val[0] == 's' || val[0] == 'S' {
+			if val[1] == 's' || val[1] == 'S' {
+				if len(scan.args) < 3 {
+					return false, nil
+				}
+				pos = 2
+			}
+		} else if val[0] == 'h' || val[0] == 'H' {
+			if len(scan.args) < 3 {
+				return false, nil
+			}
+			pos = 2
+		}
+	default:
+		return false, nil
+	}
+
+	var val uint64
+	var err error
+	switch v := scan.args[pos].(type) {
+	case uint:
+		val = uint64(v)
+	case int:
+		val = uint64(v)
+	case int8:
+		val = uint64(v)
+	case uint8:
+		val = uint64(v)
+	case int16:
+		val = uint64(v)
+	case uint16:
+		val = uint64(v)
+	case int32:
+		val = uint64(v)
+	case uint32:
+		val = uint64(v)
+	case int64:
+		val = uint64(v)
+	case uint64:
+		val = uint64(v)
+	case string:
+		val, err = strconv.ParseUint(v, 10, 64)
+		if err != nil {
+			return false, err
+		}
+	case []byte:
+		val, err = strconv.ParseUint(string(v), 10, 64)
+		if err != nil {
+			return false, err
+		}
+	default:
+		return false, err
+	}
+	return val == 0, nil
+}
+
 func (c *PlusClient) cmdNodePlus(
 	ctx context.Context,
 	cmdInfo *CommandInfo,
 	slot int,
-	mode ExecMODE,
+	cmd Cmder,
 ) (*clusterNode, error) {
 	state, err := c.state.Get(ctx)
 	if err != nil {
 		return nil, err
 	}
+	var node *clusterNode
+	isFirstScan := false
+	valMap := ctx.Value("valMap")
+	var valMap2 map[string]string
+	if valMap != nil {
+		valMap2, _ = valMap.(map[string]string)
+	}
 
-	if c.opt.ReadOnly && cmdInfo != nil && cmdInfo.ReadOnly {
-		switch mode {
-		case MODE_DEFAULT:
-			return c.slotReadOnlyNode(state, slot)
-		case MODE_CONSISTENCY:
-			return state.slotMasterNode(slot)
-		case MODE_IDC_RWS:
-			return state.slotSameIdcNode(slot)
-		case MODE_LATENCY_RWS:
-			return state.slotClosestNode(slot)
-		case MODE_RAMDOM_RWS:
-			return state.slotRandomNode(slot)
+	if scan, ok := cmd.(*ScanCmd); ok {
+		ok, err = isScanCursorZero(scan)
+		if err == nil { // 判断游标时，err为nil才考虑
+			if ok {
+				isFirstScan = true
+			} else {
+				if nodeAddr, nodeExists := valMap2["node"]; nodeExists {
+					node, err = state.nodes.Get(nodeAddr)
+					if err != nil {
+						return node, err
+					}
+				}
+			}
 		}
 	}
-	return state.slotMasterNode(slot)
+
+	if node == nil {
+		if c.opt.ReadOnly && cmdInfo != nil && cmdInfo.ReadOnly {
+			switch cmd.ExecMode() {
+			case MODE_DEFAULT:
+				node, err = c.slotReadOnlyNode(state, slot)
+			case MODE_CONSISTENCY:
+				node, err = state.slotMasterNode(slot)
+			case MODE_IDC_RWS:
+				node, err = state.slotSameIdcNode(slot)
+			case MODE_LATENCY_RWS:
+				node, err = state.slotClosestNode(slot)
+			case MODE_RAMDOM_RWS:
+				node, err = state.slotRandomNode(slot)
+			default:
+				node, err = state.slotMasterNode(slot)
+			}
+		} else {
+			node, err = state.slotMasterNode(slot)
+		}
+	}
+
+	if valMap2 != nil && node != nil {
+		valMap2["instance"] = node.Client.opt.Addr
+		if isFirstScan {
+			valMap2["node"] = node.Client.opt.Addr
+		}
+	}
+	return node, err
 }
 
 func (c *PlusClient) cmdsInfo(ctx context.Context) (map[string]*CommandInfo, error) {

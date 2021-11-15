@@ -1,10 +1,23 @@
 package common
 
-import "github.com/go-redis/redis/v8"
+import (
+	"github.com/go-redis/redis/v8"
+)
 
 var (
 	SentinelAddr = "XXXX:20019"
+	DirectAddr   = "XXXX:4028"
 )
+
+func GetDirectClient() *redis.Client {
+	client := redis.NewClient(&redis.Options{
+		Addr:     DirectAddr,
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+
+	return client
+}
 
 func GetMasterClient() *redis.PlusClient {
 	client := redis.NewPlusClient(&redis.FailoverOptions{
@@ -39,7 +52,7 @@ func GetMasterClient() *redis.PlusClient {
 	return client
 }
 
-func GetClient() *redis.PlusClient {
+func GetPlusClient() *redis.PlusClient {
 	client := redis.NewPlusClient(&redis.FailoverOptions{
 		MasterName:            "TestDBARedis001_001",
 		SentinelAddrs:         []string{SentinelAddr},
@@ -48,7 +61,7 @@ func GetClient() *redis.PlusClient {
 		RouteRandomly:         true,
 		SlaveOnly:             true,
 		Rws:                   true,
-		IdcId:                 "1234",
+		IdcId:                 "110465",
 		UseDisconnectedSlaves: false,
 		Dialer:                nil,
 		OnConnect:             nil,
