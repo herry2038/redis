@@ -6,7 +6,7 @@ import (
 
 var (
 	SentinelAddr = "XXXX:20019"
-	DirectAddr   = "XXXX:4028"
+	DirectAddr   = "XXXX:6381"
 )
 
 func GetDirectClient() *redis.Client {

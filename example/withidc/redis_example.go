@@ -19,8 +19,11 @@ func main() {
 
 	// PressTest()
 
-	//ExampleClientScan()
-	ExampleClientSscan()
+	ExampleClientScan()
+
+	//ExampleClientSscan()
+
+	//PrintfCommandInfos()
 }
 
 func ExampleNewClient() {
@@ -32,6 +35,7 @@ func ExampleNewClient() {
 
 	pong, err := client.Ping(ctx).Result()
 	fmt.Println(pong, err)
+
 	// Output: PONG <nil>
 }
 
@@ -39,6 +43,7 @@ func ExampleClientSscan() error {
 
 	client := common.GetPlusClient()
 	//client := common.GetDirectClient()
+
 	var err error
 	//var val string
 
@@ -63,7 +68,7 @@ func ExampleClientSscan() error {
 
 		for _, k := range keys {
 			if _, ok := values[k]; ok {
-				fmt.Printf("key %s already exists, get a repeated key!!!\n")
+				fmt.Printf("key %s already exists, get a repeated key!!!\n", k)
 			} else {
 				values[k] = struct{}{}
 			}
@@ -76,7 +81,7 @@ func ExampleClientSscan() error {
 
 			for _, k := range keys {
 				if _, ok := values[k]; ok {
-					fmt.Printf("key %s already exists, get a repeated key!!!\n")
+					fmt.Printf("key %s already exists, get a repeated key!!!\n", k)
 				} else {
 					values[k] = struct{}{}
 				}

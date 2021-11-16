@@ -2,10 +2,12 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"github.com/go-redis/redis/v8/internal"
 	"github.com/go-redis/redis/v8/internal/pool"
 	"math/rand"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -17,6 +19,10 @@ type PlusClient struct {
 }
 
 func NewPlusClient(failoverOpt *FailoverOptions) *PlusClient {
+	return NewPlusClientEx(failoverOpt, nil)
+}
+
+func NewPlusClientEx(failoverOpt *FailoverOptions, loadCmdsFunc func(context.Context) (map[string]*CommandInfo, error)) *PlusClient {
 	sentinelAddrs := make([]string, len(failoverOpt.SentinelAddrs))
 	copy(sentinelAddrs, failoverOpt.SentinelAddrs)
 
@@ -57,7 +63,7 @@ func NewPlusClient(failoverOpt *FailoverOptions) *PlusClient {
 		return slots, nil
 	}
 
-	c := newPlusClient(opt)
+	c := newPlusClient(opt, loadCmdsFunc)
 
 	failover.mu.Lock()
 	failover.onUpdate = func(ctx context.Context) {
@@ -68,7 +74,7 @@ func NewPlusClient(failoverOpt *FailoverOptions) *PlusClient {
 	return c
 }
 
-func newPlusClient(opt *ClusterOptions) *PlusClient {
+func newPlusClient(opt *ClusterOptions, loadCmdsFunc func(context.Context) (map[string]*CommandInfo, error)) *PlusClient {
 	opt.init()
 
 	c := &PlusClient{
@@ -79,7 +85,11 @@ func newPlusClient(opt *ClusterOptions) *PlusClient {
 		ctx: context.Background(),
 	}
 	c.state = newClusterStateHolder(c.loadState)
-	c.cmdsInfoCache = newCmdsInfoCache(c.cmdsInfo)
+	f := loadCmdsFunc
+	if f == nil {
+		f = c.cmdsInfo
+	}
+	c.cmdsInfoCache = newCmdsInfoCache(f)
 	c.cmdable = c.Process
 
 	if opt.IdleCheckFrequency > 0 {
@@ -282,6 +292,46 @@ func (c *PlusClient) cmdNode(
 	return state.slotMasterNode(slot)
 }
 
+func IsScanCursorZero(cursor interface{}) (bool, error) {
+	var val uint64
+	var err error
+	switch v := cursor.(type) {
+	case uint:
+		val = uint64(v)
+	case int:
+		val = uint64(v)
+	case int8:
+		val = uint64(v)
+	case uint8:
+		val = uint64(v)
+	case int16:
+		val = uint64(v)
+	case uint16:
+		val = uint64(v)
+	case int32:
+		val = uint64(v)
+	case uint32:
+		val = uint64(v)
+	case int64:
+		val = uint64(v)
+	case uint64:
+		val = uint64(v)
+	case string:
+		val, err = strconv.ParseUint(v, 10, 64)
+		if err != nil {
+			return false, err
+		}
+	case []byte:
+		val, err = strconv.ParseUint(string(v), 10, 64)
+		if err != nil {
+			return false, err
+		}
+	default:
+		return false, err
+	}
+	return val == 0, nil
+}
+
 func isScanCursorZero(scan *ScanCmd) (bool, error) {
 	if len(scan.args) < 2 {
 		return false, nil
@@ -359,6 +409,65 @@ func isScanCursorZero(scan *ScanCmd) (bool, error) {
 	return val == 0, nil
 }
 
+func scanCursorPos(cmdInfo *CommandInfo, cmd Cmder) int {
+	pos := 0
+	if cmdInfo != nil {
+		if cmdInfo.Name == "scan" {
+			pos = 1
+		} else if cmdInfo.Name == "sscan" || cmdInfo.Name == "hscan" {
+			pos = 2
+		}
+	} else if scan, ok := cmd.(*ScanCmd); ok {
+		cmdName := scan.args[0]
+		switch val := cmdName.(type) {
+		case []byte:
+			if val[0] == 's' || val[0] == 'S' {
+				if val[1] == 's' || val[1] == 'S' {
+					pos = 2
+				} else {
+					pos = 1
+				}
+			} else if val[0] == 'h' || val[0] == 'H' {
+				pos = 2
+			}
+		case string:
+			if val[0] == 's' || val[0] == 'S' {
+				if val[1] == 's' || val[1] == 'S' {
+					pos = 2
+				} else {
+					pos = 1
+				}
+			} else if val[0] == 'h' || val[0] == 'H' {
+				pos = 2
+			}
+		default:
+			pos = 0
+		}
+	} else {
+		switch val := cmd.Args()[0].(type) {
+		case []byte:
+			cmdName := strings.ToLower(string(val))
+			switch cmdName {
+			case "sscan", "hscan":
+				pos = 2
+			case "scan":
+				pos = 1
+			}
+		case string:
+			cmdName := strings.ToLower(val)
+			switch cmdName {
+			case "sscan", "hscan":
+				pos = 2
+			case "scan":
+				pos = 1
+			}
+		default:
+			pos = 0
+		}
+	}
+	return pos
+}
+
 func (c *PlusClient) cmdNodePlus(
 	ctx context.Context,
 	cmdInfo *CommandInfo,
@@ -377,8 +486,13 @@ func (c *PlusClient) cmdNodePlus(
 		valMap2, _ = valMap.(map[string]string)
 	}
 
-	if scan, ok := cmd.(*ScanCmd); ok {
-		ok, err = isScanCursorZero(scan)
+	pos := scanCursorPos(cmdInfo, cmd)
+	if pos > 0 {
+		if len(cmd.Args()) <= pos {
+			return nil, errors.New("invalid cmd args!")
+		}
+		var ok bool
+		ok, err = IsScanCursorZero(cmd.Args()[pos])
 		if err == nil { // 判断游标时，err为nil才考虑
 			if ok {
 				isFirstScan = true
