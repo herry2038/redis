@@ -495,6 +495,17 @@ func (c cmdable) Del(ctx context.Context, keys ...string) *IntCmd {
 	return cmd
 }
 
+func (c cmdable) Dev(ctx context.Context, key string, version uint64) *IntCmd {
+	args := make([]interface{}, 3)
+	args[0] = "dev"
+	args[1] = key
+	args[2] = version
+
+	cmd := NewIntCmd(ctx, args...)
+	_ = c(ctx, cmd)
+	return cmd
+}
+
 func (c cmdable) Unlink(ctx context.Context, keys ...string) *IntCmd {
 	args := make([]interface{}, 1+len(keys))
 	args[0] = "unlink"
@@ -865,6 +876,27 @@ func (c cmdable) Set(ctx context.Context, key string, value interface{}, expirat
 		args = append(args, "keepttl")
 	}
 
+	cmd := NewStatusCmd(ctx, args...)
+	_ = c(ctx, cmd)
+	return cmd
+}
+
+func (c cmdable) SetWithVersion(ctx context.Context, key string, value interface{}, expiration time.Duration, version uint64) *StatusCmd {
+	args := make([]interface{}, 3, 5)
+	args[0] = "set"
+	args[1] = key
+	args[2] = value
+	if expiration > 0 {
+		if usePrecise(expiration) {
+			args = append(args, "px", formatMs(ctx, expiration))
+		} else {
+			args = append(args, "ex", formatSec(ctx, expiration))
+		}
+	} else if expiration == KeepTTL {
+		args = append(args, "keepttl")
+	}
+
+	args = append(args, "v", version)
 	cmd := NewStatusCmd(ctx, args...)
 	_ = c(ctx, cmd)
 	return cmd
