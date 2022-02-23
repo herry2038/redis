@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	SentinelAddr = "fstst-group0001-001-sentinel.yy.com:20019"
+	SentinelAddr = "XXXX:20019"
 	DirectAddr   = "herrypc:4025"
 )
 
